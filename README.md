@@ -1,36 +1,117 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MenuRest
 
-## Getting Started
+Gestión de menús digitales para restaurantes. Permite crear/actualizar la información del restaurante, administrar categorías e ítems, y exponer un menú público por slug. Incluye endpoints API, lógica de subida de imágenes y una UI para panel y cliente.
 
-First, run the development server:
+## Stack
+
+- Next.js 15 (App Router) + React 19 + TypeScript
+- Tailwind CSS 4
+- Prisma ORM 6 + SQLite
+- jose (JWT), axios, lucide-react, Radix UI
+
+## Requisitos
+
+- Node.js 18+ (recomendado LTS)
+- pnpm (o npm/yarn)
+
+## Variables de entorno
+
+Crea un archivo `.env.local` en la raíz con al menos:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# SQLite (la base incluida está en prisma/dev.db)
+DATABASE_URL="file:./prisma/dev.db"
+
+# Secreto para firmar/verificar JWT
+JWT_SECRET="cambia_este_valor_por_un_secreto_fuerte"
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Instalación y puesta en marcha
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+pnpm install
+pnpm prisma:deploy   # ejecuta migrations y generate
+pnpm dev             # inicia el servidor (http://localhost:3000)
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Scripts
 
-## Learn More
+- `pnpm dev`: desarrollo (Turbopack)
+- `pnpm build`: build (Turbopack)
+- `pnpm start`: producción
+- `pnpm lint`: linting
+- `pnpm prisma:deploy`: `prisma migrate deploy` + `prisma generate`
 
-To learn more about Next.js, take a look at the following resources:
+## Estructura principal
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+src/
+  app/
+    [slug]/            # Menú público por slug
+    api/
+      auth/            # login/logout
+      restaurant/      # create/update restaurante
+    crear-restaurante/ # página para alta de restaurante
+    dashboard/         # layout y páginas del panel
+    layout.tsx         # layout raíz
+    globals.css        # estilos globales
+  actions/
+    restaurant/        # CRUD restaurante (server actions)
+    getCategoriesAndItems.ts
+  components/
+    settings/          # RestaurantForm (formulario)
+    menu-cliente/      # UI del menú público
+    navigation/, ui/   # componentes compartidos
+  lib/
+    prisma.ts          # PrismaClient
+    jwt.ts             # validación de token (cookies + jose)
+    restaurant/        # utilidades (dataMapeo)
+  types/               # tipos TS (Category, Item, User, Restaurant)
+prisma/
+  schema.prisma        # modelo de datos (SQLite)
+  dev.db               # base SQLite de desarrollo
+  migrations/          # migraciones
+  seed.ts              # datos de ejemplo (no configurado como seed por script)
+public/
+  uploads/restaurants/ # destino de logos subidos
+  image/menu/          # imágenes de ejemplo para seed
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Flujos principales
 
-## Deploy on Vercel
+- **Autenticación**: `src/app/api/auth/login` y `logout` gestionan token en cookie `token`. `src/lib/jwt.ts` valida el JWT con `JWT_SECRET`.
+- **Crear restaurante**: `POST /api/restaurant/create` procesa `FormData`, crea el restaurante y si hay cookie de sesión, actualiza el `restaurantId` en el token.
+- **Actualizar restaurante**: `POST /api/restaurant/update` actualiza los campos del restaurante y puede subir nuevo logo.
+- **Menú público**: `GET /[slug]` obtiene restaurante por slug y categorías/ítems para renderizar `MenuClient`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Endpoints
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `POST /api/restaurant/create`
+  - FormData: `name`, `address`, `phone`, `email`, `description`, `website`, `userId`, `logo` (File opcional)
+- `POST /api/restaurant/update`
+  - FormData: `id`, `address`, `phone`, `email`, `description`, `website`, `userId`, `logo` (File opcional)
+
+Respuesta exitosa: `{ success: true, data: { ... } }`
+
+## Subida de imágenes (logos)
+
+- Validación en cliente: tipos permitidos PNG/JPG/WEBP y tamaño ≤ 1 MB.
+- Almacén: `public/uploads/restaurants/{id}_{slug}/logo_{slug}.{ext}`
+- Tras subir, se actualiza `logoUrl` del restaurante.
+
+## Notas de desarrollo
+
+- `src/components/settings/FormRestaurant.tsx` es un Client Component con validación de tipos/tamaño de logo.
+- Notificaciones: `react-toastify` (asegúrate de importar sus estilos y montar un `ToastContainer`).
+- Tipado estricto en TS (`strict: true`).
+
+## Problemas comunes
+
+- **No se encuentra react-toastify**: `pnpm add react-toastify` e importa `react-toastify/dist/ReactToastify.css`.
+- **Error con FK al crear usuario con restaurantId = -1**: usa `NULL` si la FK a `RestaurantInfo(id)` está activa.
+
+## Roadmap breve
+
+- Roles y permisos en panel.
+- Estados/stock de ítems en tiempo real.
+- Optimización de imágenes (procesado/resize) en subida.
