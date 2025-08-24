@@ -1,0 +1,69 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int            @id @default(autoincrement())
+  username     String         @unique @default("")
+  password     String         @default("")
+  name         String?        // Nombre del usuario
+  lastname     String?        // Apellido del usuario
+  email        String?        // Email opcional
+  role         String           @default("STAFF")
+  isActive     Boolean        @default(true)
+  lastLogin    DateTime?      // Último inicio de sesión
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @default(now()) @updatedAt
+  restaurantId Int?           @default(-1)
+  restaurant   RestaurantInfo? @relation("RestaurantUsers", fields: [restaurantId], references: [id])
+}
+
+model RestaurantInfo {
+  id          Int       @id @default(autoincrement())
+  name        String    @default("")
+  logoUrl     String    @default("")
+  address     String    @default("")
+  phone       String    @default("")
+  email       String    @default("")
+  description String?   // Descripción del restaurante
+  website     String?   // Sitio web opcional
+  slug        String    @unique
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+  users       User[]    @relation("RestaurantUsers")
+  items       Item[]
+}
+
+model Category {
+  id           Int      @id @default(autoincrement())
+  name         String   @default("")
+  menuPosition Int      @default(1)
+  isActive     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+  items        Item[]   @relation("CategoryItems")
+  restaurantId Int     @default(-1)
+}
+
+model Item {
+  id          Int      @id @default(autoincrement())
+  name        String   @default("")
+  description String   @default("")
+  price       Float    @default(0)
+  imageUrl    String   @default("")
+  isActive    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+  categoryId  Int      @default(1)
+  category    Category @relation("CategoryItems", fields: [categoryId], references: [id])
+  restaurantId Int     
+  restaurant   RestaurantInfo @relation(fields: [restaurantId], references: [id])
+}
